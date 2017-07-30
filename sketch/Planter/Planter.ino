@@ -11,6 +11,10 @@ const int MOISTURE_MIN = 0;
 const int MOISTURE_MAX = 950;
 const float HUE_MAX = 240;
 
+const char* MESSAGE_DRY = "dry";
+const char* MESSAGE_OK = "ok";
+const char* MESSAGE_WET = "wet";
+
 typedef struct {
   int red;
   int green;
@@ -98,12 +102,12 @@ float moisture_to_hue(float moisture) {
 
 const char* moisture_to_text(float moisture) {
   if (moisture <= 300) {
-    return "dry";
+    return MESSAGE_DRY;
   }
   else if(moisture <= 700) {
-    return "ok";
+    return MESSAGE_OK;
   }
-  else return "wet";
+  else return MESSAGE_WET;
 }
 
 void loop() {
