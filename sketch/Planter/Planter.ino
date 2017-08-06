@@ -3,23 +3,37 @@
 
 rgb_lcd lcd;
 
-const int moisturePin = A0;
-const int temperaturePin = A1;      // pin of temperature sensor
+const int temperaturePin = A3;      // pin of temperature sensor
+
 const int B = 3975;                  // B value of the thermistor
 
-const int MOISTURE_MIN = 0;
-const int MOISTURE_MAX = 950;
+const int MOISTURE_MIN = 400;
+const int MOISTURE_MAX = 800;
 const float HUE_MAX = 240;
+const float HUE_MIN = 0;
 
 const char* MESSAGE_DRY = "dry";
-const char* MESSAGE_OK = "ok";
+const char* MESSAGE_OK = " ok";
 const char* MESSAGE_WET = "wet";
+
+const int moistureSensors[] = { A0, A1, A2 };
 
 typedef struct {
   int red;
   int green;
   int blue;
 } Color;
+
+typedef struct {
+  bool isPressed;
+  int pin;
+} Button;
+
+int moistureSensor = 0;
+unsigned long lastRenderTime;
+bool requestRender;
+Button moistureButton;
+
 
 void setup() {
   Serial.begin(9600);
@@ -29,6 +43,19 @@ void setup() {
   lcd.print("Welcome");
   delay(1000);
   lcd.setRGB(255,255,255);
+
+  moistureButton.pin = 8;
+  // Configure the button's pin for input signals.
+  pinMode(moistureButton.pin, INPUT);
+}
+
+bool is_pressed(Button aButton) {
+  return digitalRead(aButton.pin);
+}
+
+void switch_moisture() {
+  moistureSensor++;
+  moistureSensor = moistureSensor % (sizeof(moistureSensors) / sizeof(moistureSensors[0]));
 }
 
 float read_temperature()
@@ -40,7 +67,7 @@ float read_temperature()
 }
 
 int read_moisture() {
-  int value = analogRead(moisturePin);
+  int value = analogRead(moistureSensors[moistureSensor]);
   return value;
 }
 
@@ -97,20 +124,42 @@ Color hsv_to_rgb(float degrees) {
 }
 
 float moisture_to_hue(float moisture) {
-  return moisture / (MOISTURE_MAX - MOISTURE_MIN) * HUE_MAX;
+  float value = max(min(moisture, MOISTURE_MAX),MOISTURE_MIN);
+  return (value - MOISTURE_MIN) / (MOISTURE_MAX - MOISTURE_MIN) * HUE_MAX + HUE_MIN;
 }
 
 const char* moisture_to_text(float moisture) {
-  if (moisture <= 300) {
+  if (moisture <= 450) {
     return MESSAGE_DRY;
   }
-  else if(moisture <= 700) {
+  else if(moisture <= 650) {
     return MESSAGE_OK;
   }
   else return MESSAGE_WET;
 }
 
-void loop() {
+void process_events() {
+  if (is_pressed(moistureButton)) {
+    if (!moistureButton.isPressed) {
+      switch_moisture();
+      requestRender = true;
+    }
+    moistureButton.isPressed = true;
+  }
+  else {
+    moistureButton.isPressed = false;
+  }
+}
+
+void process_render() {
+  if (requestRender || (abs(millis() - lastRenderTime) > 5000)) {
+    requestRender = false;
+    render();
+    lastRenderTime = millis();
+  }
+}
+
+void render() {
   lcd.clear();
  
   int moisture = read_moisture();
@@ -123,10 +172,17 @@ void loop() {
   lcd.print(temperature);
   lcd.print(" C");
   lcd.setCursor(0, 1); 
-  lcd.print("Moist: ");
+  lcd.print("Moist(");
+  lcd.print(moistureSensor + 1);
+  lcd.print(") ");
   lcd.print(moisture);
-  lcd.print(" (");
+  lcd.print(" ");
+  lcd.setCursor(13, 1);
   lcd.print(moisture_to_text(moisture));
-  lcd.print(")");
-  delay(5000);          // delay 5s
+}
+
+void loop() {
+  process_events();
+  process_render();
+  delay(1);          // delay 1ms
 }
